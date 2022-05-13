@@ -257,10 +257,15 @@ func (c *Controller) updateHealthStatusForTenant(tenant *miniov2.Tenant) error {
 		return errors.New("MinIO server secretkey not set")
 	}
 	bearerToken := tenant.GenBearerToken(string(accessKey), string(secretKey))
-
+	
 	metrics, err := getPrometheusMetricsForTenant(tenant, bearerToken)
 	if err != nil {
 		klog.Infof("'%s/%s' Can't generate tenant prometheus token: %v", tenant.Namespace, tenant.Name, err)
+		tenant.Status.Usage.Usage = 0
+		tenant.Status.Usage.Capacity = 0
+		if tenant, err = c.updatePoolStatus(context.Background(), tenant); err != nil {
+			klog.Infof("'%s/%s' Can't update tenant status for usage: %v", tenant.Namespace, tenant.Name, err)
+		}
 	} else {
 		if metrics != nil {
 			tenant.Status.Usage.Usage = metrics.Usage
